@@ -5,19 +5,20 @@ pub use input::*;
 
 use std::io::{self, Read, Write};
 
-use ansi_term::Color;
-use ansi_term::Color::Fixed;
+use ansi_term::{Color, Style};
 
 use crate::squeezer::{SqueezeAction, Squeezer};
 
 const BUFFER_SIZE: usize = 256;
 
-const COLOR_NULL: Color = Fixed(242); // grey
-const COLOR_OFFSET: Color = Fixed(242); // grey
-const COLOR_ASCII_PRINTABLE: Color = Color::Cyan;
-const COLOR_ASCII_WHITESPACE: Color = Color::Green;
-const COLOR_ASCII_OTHER: Color = Color::Purple;
-const COLOR_NONASCII: Color = Color::Yellow;
+lazy_static::lazy_static! {
+    static ref STYLE_NULL: Style = Color::Black.bold(); // grey
+    static ref STYLE_OFFSET: Style = Color::Black.bold(); // grey
+    static ref STYLE_ASCII_PRINTABLE: Style = Color::Cyan.normal();
+    static ref STYLE_ASCII_WHITESPACE: Style = Color::Green.normal();
+    static ref STYLE_ASCII_OTHER: Style = Color::Purple.normal();
+    static ref STYLE_NONASCII: Style = Color::Yellow.normal();
+}
 
 pub enum ByteCategory {
     Null,
@@ -45,15 +46,15 @@ impl Byte {
         }
     }
 
-    fn color(self) -> &'static Color {
+    fn style(self) -> &'static Style {
         use crate::ByteCategory::*;
 
         match self.category() {
-            Null => &COLOR_NULL,
-            AsciiPrintable => &COLOR_ASCII_PRINTABLE,
-            AsciiWhitespace => &COLOR_ASCII_WHITESPACE,
-            AsciiOther => &COLOR_ASCII_OTHER,
-            NonAscii => &COLOR_NONASCII,
+            Null => &STYLE_NULL,
+            AsciiPrintable => &STYLE_ASCII_PRINTABLE,
+            AsciiWhitespace => &STYLE_ASCII_WHITESPACE,
+            AsciiOther => &STYLE_ASCII_OTHER,
+            NonAscii => &STYLE_NONASCII,
         }
     }
 
@@ -66,7 +67,7 @@ impl Byte {
             AsciiWhitespace if self.0 == 0x20 => ' ',
             AsciiWhitespace => '_',
             AsciiOther => '•',
-            NonAscii => '×',
+            NonAscii => '•',
         }
     }
 }
@@ -131,7 +132,7 @@ impl BorderStyle {
 
     fn inner_sep(&self) -> char {
         match self {
-            BorderStyle::Unicode => '┊',
+            BorderStyle::Unicode => '│',
             BorderStyle::Ascii => '|',
             BorderStyle::None => ' ',
         }
@@ -173,7 +174,7 @@ impl<'a, Writer: Write> Printer<'a, Writer> {
                 .map(|i| {
                     let byte_hex = format!("{:02x} ", i);
                     if show_color {
-                        Byte(i).color().paint(byte_hex).to_string()
+                        Byte(i).style().paint(byte_hex).to_string()
                     } else {
                         byte_hex
                     }
@@ -183,7 +184,7 @@ impl<'a, Writer: Write> Printer<'a, Writer> {
                 .map(|i| {
                     let byte_char = format!("{}", Byte(i).as_char());
                     if show_color {
-                        Byte(i).color().paint(byte_char).to_string()
+                        Byte(i).style().paint(byte_char).to_string()
                     } else {
                         byte_char
                     }
@@ -243,7 +244,7 @@ impl<'a, Writer: Write> Printer<'a, Writer> {
             self.header_was_printed = true;
         }
 
-        let style = COLOR_OFFSET.normal();
+        let style = *STYLE_OFFSET;
         let byte_index = format!("{:08x}", self.idx - 1 + self.display_offset);
         let formatted_string = if self.show_color {
             format!("{}", style.paint(byte_index))
@@ -367,7 +368,7 @@ impl<'a, Writer: Write> Printer<'a, Writer> {
         match squeeze_action {
             SqueezeAction::Print => {
                 self.buffer_line.clear();
-                let style = COLOR_OFFSET.normal();
+                let style = *STYLE_OFFSET;
                 let asterisk = if self.show_color {
                     format!("{}", style.paint("*"))
                 } else {
